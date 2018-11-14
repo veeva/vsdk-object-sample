@@ -1,0 +1,12 @@
+<vaultpackage xmlns="https://veevavault.com/">
+<name>PKG-vsdk-object-sample-action-code</name>
+<source>
+<vault></vault>
+<author>test.admin@knee-test.com</author>
+</source>
+<summary>The vsdk-object-sample user action code.</summary>
+<description>This VPK contains the incremental Vault Java SDK code for the vsdk-object-sample "vSDKChangeOwnerUserAction.java" class.</description>
+<javasdk>
+	<deployment_option>incremental</deployment_option>
+</javasdk>
+</vaultpackage>

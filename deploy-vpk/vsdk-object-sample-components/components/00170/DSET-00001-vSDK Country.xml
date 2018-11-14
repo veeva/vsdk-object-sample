@@ -1,0 +1,1 @@
+<stepheader><label>DSET-00001-vSDK Country</label><steprequired>False</steprequired><checksum>1cfd108e32d8e256045f372177a905af</checksum><datastepheader><object>vsdk_country__c</object><idparam>name__v</idparam><datatype>Object</datatype><action>Upsert</action><recordcount>131</recordcount></datastepheader></stepheader>

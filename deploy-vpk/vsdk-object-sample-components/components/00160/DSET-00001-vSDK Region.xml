@@ -1,0 +1,1 @@
+<stepheader><label>DSET-00001-vSDK Region</label><steprequired>False</steprequired><checksum>71102567710eef579b40293ca1542aa7</checksum><datastepheader><object>vsdk_region__c</object><idparam>name__v</idparam><datatype>Object</datatype><action>Upsert</action><recordcount>5</recordcount></datastepheader></stepheader>
