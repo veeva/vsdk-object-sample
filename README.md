@@ -28,7 +28,7 @@ The project contains two separate vault packages (VPK) in the "deploy-vpk" direc
 The  **VPKs need to be deployed to your vault**  prior to debugging these use cases:
 
 1.  Clone or download the sample Maven project [vSDK Object Sample project](https://github.com/veeva/vsdk-object-sample) from GitHub.
-2.  Run through the [Getting Started](https://developer.veevavault.com/sdk/#Getting_Started) guide to setup your deployment environment.
+2.  Run through the [Getting Started](https://developer.veevavault.com/sdk/#Getting_Started) guide to set up your deployment environment.
 3.  Log in to your vault and navigate to **Admin > Deployment > Inbound Packages** and click **Import**: 
 
     > Deploy Object Action code:  Select the **\deploy-vpk\code\vsdk-object-sample-action-code.vpk** file.
