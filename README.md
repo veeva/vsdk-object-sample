@@ -15,10 +15,10 @@ The vsdk-object-sample project covers the creation of a vSDK Product record and 
 Import the project as a Maven project. This will automatically pull in the required Vault Java SDK dependencies. 
 
 For Intellij this is done by:
--	File -> Open -> Navigate to project folder -> Select the 'pom.xml' file -> Open as Project
+- File > Open > Navigate to project folder -> Select the 'pom.xml' file > Open as Project
 
 For Eclipse this is done by:
--	File -> Import -> Maven -> Existing Maven Projects -> Navigate to project folder -> Select the 'pom.xml' file
+- File > Import > Maven > Existing Maven Projects > Navigate to project folder > Select the 'pom.xml' file
 
 
 ## Setup
@@ -46,7 +46,7 @@ To see the project in action, configure the  [debugger](https://developer.veevav
 
 Once the project is in debug or deployed to vault:
 
-1.  Navigate to your  **Admin -> Business Admin -> vSDK Product** tab in your vault and  **Create** a new record.
+1.  Navigate to your  **Admin > Business Admin > vSDK Product** tab in your vault and  **Create** a new record.
 2.  Enter any value in the  **Name** field.
 3.  Click  **Save**.
 4.  While vault attempts to save the record, each of the trigger examples discussed below will run.
