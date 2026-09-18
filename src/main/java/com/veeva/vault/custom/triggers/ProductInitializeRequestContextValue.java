@@ -3,7 +3,6 @@ package com.veeva.vault.custom.triggers;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import com.veeva.vault.custom.udc.RequestContextObject;
 import com.veeva.vault.custom.udc.UserDefinedUtils;
@@ -30,19 +29,19 @@ public class ProductInitializeRequestContextValue implements RecordTrigger {
     	
     	if (UserDefinedUtils.example_type.equals(UserDefinedUtils.REQUEST_CONTEXT)){
     		
-            // Retrieve Regions from all Product records and passes the query to the RequestContextObject to run the QueryService and create a hashmap.
-            Set<String> regions = VaultCollections.newSet();
-            
+            // Retrieve Regions from all Product records and pass the region IDs to the RequestContextObject to run the QueryService and create a hashmap.
+            // The IDs are passed as a List and resolved through a TokenRequest inside RequestContextObject rather than concatenated into a query String.
+            List<String> regionIds = VaultCollections.newList();
+
             recordTriggerContext.getRecordChanges().stream().forEach(recordChange -> {
                 String regionId = recordChange.getNew().getValue("region__c", ValueType.STRING);
-                regions.add("'" + regionId + "'");
+                regionIds.add(regionId);
             });
-            String regionsToQuery = String.join (",",regions);
-            
-            
+
+
             //Initialize the requestContextObject object and set additional fields on the object. Once ready, save the object to the RequestContext for re-use with
             //RequestContext.get().setValue()
-            RequestContextObject requestContextObject = new RequestContextObject(regionsToQuery);
+            RequestContextObject requestContextObject = new RequestContextObject(regionIds);
             
             requestContextObject.startTimestamp = String.valueOf(Instant.now().toEpochMilli());
             requestContextObject.example_type = example_type;

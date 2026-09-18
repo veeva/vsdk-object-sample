@@ -13,9 +13,12 @@ import com.veeva.vault.sdk.api.data.RecordTriggerContext;
 import com.veeva.vault.sdk.api.data.RecordTriggerInfo;
 import com.veeva.vault.sdk.api.job.JobParameters;
 import com.veeva.vault.sdk.api.job.JobService;
-import com.veeva.vault.sdk.api.query.QueryResponse;
-import com.veeva.vault.sdk.api.query.QueryResult;
+import com.veeva.vault.sdk.api.query.Query;
+import com.veeva.vault.sdk.api.query.QueryExecutionRequest;
+import com.veeva.vault.sdk.api.query.QueryExecutionResult;
 import com.veeva.vault.sdk.api.query.QueryService;
+import com.veeva.vault.sdk.api.token.TokenRequest;
+import com.veeva.vault.sdk.api.token.TokenService;
 
 import java.util.Iterator;
 import java.util.List;
@@ -97,25 +100,43 @@ public class CountryBrandLifeCycleUserActions implements RecordTrigger {
 	
 	                } else if (state != null && (state.equals("terminated_state__c") || state.equals("not_applicable_state__c"))) {
 	
-	                    //Query all Country Brand records for the same parent Product record
+	                    //Query all Country Brand records for the same parent Product record.
+	                    //The parent Product ID and current record ID are supplied through a TokenRequest and
+	                    //the query is built with newQueryBuilder() instead of concatenating the IDs into a String.
 	                    QueryService queryService = ServiceLocator.locate(QueryService.class);
-	                    String queryCountryBrand = "select id, state__v from vsdk_country_brand__c where vsdk_product__cr.id=" + "\'" + parentProductId + "\'" + "and id !=" + "\'" + id + "\'";
-	                    QueryResponse queryResponse = queryService.query(queryCountryBrand);
-	                    Iterator<QueryResult> iterator = queryResponse.streamResults().iterator();
+	                    TokenService tokenService = ServiceLocator.locate(TokenService.class);
+	                    TokenRequest tokenRequest = tokenService.newTokenRequestBuilder()
+	                            .withValue("Custom.parent_product_id", parentProductId)
+	                            .withValue("Custom.country_brand_id", id)
+	                            .build();
+	                    Query queryCountryBrand = queryService.newQueryBuilder()
+	                            .withSelect(VaultCollections.asList("id", "state__v"))
+	                            .withFrom("vsdk_country_brand__c")
+	                            .withWhere("vsdk_product__cr.id = ${Custom.parent_product_id} and id != ${Custom.country_brand_id}")
+	                            .build();
+	                    QueryExecutionRequest queryRequest = queryService.newQueryExecutionRequestBuilder()
+	                            .withQuery(queryCountryBrand)
+	                            .withTokenRequest(tokenRequest)
+	                            .build();
 	
 	                    //Check Country Brand records retrieved are all "Terminated" or "Not Applicable".
-	                    boolean allTerminated = true;
-	                    while (iterator.hasNext()) {
-	                        QueryResult qr = (QueryResult) iterator.next();
-	                        String nextChildState = qr.getValue("state__v", ValueType.STRING);
-	                        if (nextChildState != null && !nextChildState.equals("terminated_state__c") && !nextChildState.equals("not_applicable_state__c")) {
-	                            allTerminated = false;
-	                            break;
-	                        }
-	                    }
+	                    boolean[] allTerminated = {true};
+	                    queryService.query(queryRequest)
+	                            .onSuccess(queryExecutionResponse -> {
+	                                Iterator<QueryExecutionResult> iterator = queryExecutionResponse.streamResults().iterator();
+	                                while (iterator.hasNext()) {
+	                                    QueryExecutionResult qr = iterator.next();
+	                                    String nextChildState = qr.getValue("state__v", ValueType.STRING);
+	                                    if (nextChildState != null && !nextChildState.equals("terminated_state__c") && !nextChildState.equals("not_applicable_state__c")) {
+	                                        allTerminated[0] = false;
+	                                        break;
+	                                    }
+	                                }
+	                            })
+	                            .execute();
 	
 	                    //If all vSDK Country Brand records for the parent vSDK Product record are terminated, update parent vSDK Product record to "Off Market".
-	                    if (allTerminated && (parentState != null && !parentState.equals("pending_state__c") && !parentState.equals("off_market_state__c"))) {
+	                    if (allTerminated[0] && (parentState != null && !parentState.equals("pending_state__c") && !parentState.equals("off_market_state__c"))) {
 	                        jobParameters.setValue("user_action_name", "change_state_to_off_market_useraction__c");
 	                        jobParameters.setValue("records", parentProductRecords);
 	                        jobService.run(jobParameters);

@@ -4,7 +4,8 @@ import com.veeva.vault.sdk.api.core.BatchOperationError;
 import com.veeva.vault.sdk.api.core.RollbackException;
 import com.veeva.vault.sdk.api.core.UserDefinedClassInfo;
 import com.veeva.vault.sdk.api.core.ValueType;
-import com.veeva.vault.sdk.api.data.*;
+import com.veeva.vault.sdk.api.data.Record;
+import com.veeva.vault.sdk.api.data.RecordChange;
 
 import java.util.List;
 

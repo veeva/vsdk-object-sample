@@ -7,9 +7,13 @@ import com.veeva.vault.sdk.api.core.ServiceLocator;
 import com.veeva.vault.sdk.api.core.UserDefinedClassInfo;
 import com.veeva.vault.sdk.api.core.ValueType;
 import com.veeva.vault.sdk.api.core.VaultCollections;
-import com.veeva.vault.sdk.api.query.QueryResponse;
-import com.veeva.vault.sdk.api.query.QueryResult;
+import com.veeva.vault.sdk.api.query.Query;
+import com.veeva.vault.sdk.api.query.QueryExecutionRequest;
+import com.veeva.vault.sdk.api.query.QueryExecutionResponse;
+import com.veeva.vault.sdk.api.query.QueryExecutionResult;
 import com.veeva.vault.sdk.api.query.QueryService;
+import com.veeva.vault.sdk.api.token.TokenRequest;
+import com.veeva.vault.sdk.api.token.TokenService;
 
 /**
 *
@@ -44,19 +48,35 @@ public class RequestContextObject implements RequestContextValue {
    
    public RequestContextObject(){}
 
-   public RequestContextObject (String regionsToQuery){
+   public RequestContextObject (List<String> regionIds){
 
-   // Constructor to create a regionCountryMap <region, countries> by querying the Region object 
-   // to retrieve countries in the provided regions.	   
+   // Constructor to create a regionCountryMap <region, countries> by querying the Region object
+   // to retrieve countries in the provided regions.
+   // The region IDs are supplied through a TokenRequest and the query is built with
+   // newQueryBuilder() instead of concatenating the IDs into a raw query String.
        QueryService queryService = ServiceLocator.locate(QueryService.class);
-       String queryCountry = "select id, name__v, region__c " +
-               "from vsdk_country__c where region__c contains (" + regionsToQuery + ")";
-       QueryResponse queryResponse = queryService.query(queryCountry);
-       setMap(this.createQueryMap(queryResponse, "region__c", ValueType.STRING));
-   }  
-   
-// Generic method to create a Map where the defined keyField (key) maps to records (value) from the query result.	
-   public <T> Map<String, QueryObject> createQueryMap (QueryResponse queryResponse, String keyField, ValueType<T> fieldType){
+       TokenService tokenService = ServiceLocator.locate(TokenService.class);
+       TokenRequest tokenRequest = tokenService.newTokenRequestBuilder()
+               .withValue("Custom.region_ids", regionIds)
+               .build();
+       Query queryCountry = queryService.newQueryBuilder()
+               .withSelect(VaultCollections.asList("id", "name__v", "region__c"))
+               .withFrom("vsdk_country__c")
+               .withWhere("region__c CONTAINS (${Custom.region_ids})")
+               .build();
+       QueryExecutionRequest queryRequest = queryService.newQueryExecutionRequestBuilder()
+               .withQuery(queryCountry)
+               .withTokenRequest(tokenRequest)
+               .build();
+       queryService.query(queryRequest)
+               .onSuccess(queryExecutionResponse -> {
+                   setMap(this.createQueryMap(queryExecutionResponse, "region__c", ValueType.STRING));
+               })
+               .execute();
+   }
+
+// Generic method to create a Map where the defined keyField (key) maps to records (value) from the query result.
+   public <T> Map<String, QueryObject> createQueryMap (QueryExecutionResponse queryResponse, String keyField, ValueType<T> fieldType){
 
       Map<String, QueryObject> queryMap = VaultCollections.newMap();
       queryResponse.streamResults().forEach(queryResult -> {
@@ -90,7 +110,7 @@ public class RequestContextObject implements RequestContextValue {
 	   
 	   public QueryObject(){}
 	   
-	   public void addItem(QueryResult response){
+	   public void addItem(QueryExecutionResult response){
 		   results.add(new ResponseObject(response));
 	   }
 	   
@@ -104,7 +124,7 @@ public class RequestContextObject implements RequestContextValue {
 	   
 	   public ResponseObject(){}
 	   
-	   public ResponseObject(QueryResult response) {
+	   public ResponseObject(QueryExecutionResult response) {
 		   id = response.getValue("id", ValueType.STRING);
 		   name__v = response.getValue("name__v", ValueType.STRING);
 		   region__c = response.getValue("region__c", ValueType.STRING);    

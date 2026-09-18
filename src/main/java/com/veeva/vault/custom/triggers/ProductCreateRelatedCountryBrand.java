@@ -8,10 +8,19 @@ import com.veeva.vault.sdk.api.core.RequestContext;
 import com.veeva.vault.sdk.api.core.ServiceLocator;
 import com.veeva.vault.sdk.api.core.ValueType;
 import com.veeva.vault.sdk.api.core.VaultCollections;
-import com.veeva.vault.sdk.api.data.*;
-import com.veeva.vault.sdk.api.query.QueryResponse;
-import com.veeva.vault.sdk.api.query.QueryResult;
+import com.veeva.vault.sdk.api.data.Record;
+import com.veeva.vault.sdk.api.data.RecordChange;
+import com.veeva.vault.sdk.api.data.RecordEvent;
+import com.veeva.vault.sdk.api.data.RecordService;
+import com.veeva.vault.sdk.api.data.RecordTrigger;
+import com.veeva.vault.sdk.api.data.RecordTriggerContext;
+import com.veeva.vault.sdk.api.data.RecordTriggerInfo;
+import com.veeva.vault.sdk.api.query.Query;
+import com.veeva.vault.sdk.api.query.QueryExecutionRequest;
+import com.veeva.vault.sdk.api.query.QueryExecutionResult;
 import com.veeva.vault.sdk.api.query.QueryService;
+import com.veeva.vault.sdk.api.token.TokenRequest;
+import com.veeva.vault.sdk.api.token.TokenService;
 
 import java.util.Iterator;
 import java.util.List;
@@ -71,30 +80,45 @@ public class ProductCreateRelatedCountryBrand implements RecordTrigger  {
         List<Record> recordList = VaultCollections.newList();
         
     	 // Retrieve Regions from all Product records
-        Set<String> regions = VaultCollections.newSet();
+        List<String> regions = VaultCollections.newList();
         recordTriggerContext.getRecordChanges().stream().forEach(recordChange -> {
             String regionId = recordChange.getNew().getValue("region__c", ValueType.STRING);
-            regions.add("'" + regionId + "'");
+            regions.add(regionId);
         });
-        String regionsToQuery = String.join (",",regions);
 
-        // Query Country object to select countries for regions referenced by all Product input records
+        // Query Country object to select countries for regions referenced by all Product input records.
+        // The list of region IDs is supplied through a TokenRequest instead of being concatenated into
+        // the query string, and the query is built with newQueryBuilder() rather than a raw String.
         QueryService queryService = ServiceLocator.locate(QueryService.class);
-        String queryCountry = "select id, name__v, region__c " +
-                "from vsdk_country__c where region__c contains (" + regionsToQuery + ")";
-        QueryResponse queryResponse = queryService.query(queryCountry);
+        TokenService tokenService = ServiceLocator.locate(TokenService.class);
+        TokenRequest tokenRequest = tokenService.newTokenRequestBuilder()
+                .withValue("Custom.region_ids", regions)
+                .build();
+        Query queryCountry = queryService.newQueryBuilder()
+                .withSelect(VaultCollections.asList("id", "name__v", "region__c"))
+                .withFrom("vsdk_country__c")
+                .withWhere("region__c CONTAINS (${Custom.region_ids})")
+                .build();
+        QueryExecutionRequest queryRequest = queryService.newQueryExecutionRequestBuilder()
+                .withQuery(queryCountry)
+                .withTokenRequest(tokenRequest)
+                .build();
 
         // Create a Map of Regions (key) and Countries (value) from the query result
-        Map<String, List<QueryResult>> countriesInRegionMap = VaultCollections.newMap();
-        queryResponse.streamResults().forEach(queryResult -> {
-            String region = queryResult.getValue("region__c",ValueType.STRING);
-            if (countriesInRegionMap.containsKey(region)) {
-                List<QueryResult> countries = countriesInRegionMap.get(region);
-                countries.add(queryResult);
-                countriesInRegionMap.put(region,countries);
-            } else
-                countriesInRegionMap.putIfAbsent(region,VaultCollections.asList(queryResult));
-        });
+        Map<String, List<QueryExecutionResult>> countriesInRegionMap = VaultCollections.newMap();
+        queryService.query(queryRequest)
+                .onSuccess(queryExecutionResponse -> {
+                    queryExecutionResponse.streamResults().forEach(queryResult -> {
+                        String region = queryResult.getValue("region__c", ValueType.STRING);
+                        if (countriesInRegionMap.containsKey(region)) {
+                            List<QueryExecutionResult> countries = countriesInRegionMap.get(region);
+                            countries.add(queryResult);
+                            countriesInRegionMap.put(region, countries);
+                        } else
+                            countriesInRegionMap.putIfAbsent(region, VaultCollections.asList(queryResult));
+                    });
+                })
+                .execute();
 
         // Go through each Product record, look up countries for the region assigned to the Product,
         // and create new Country Brand records for each country.
@@ -104,10 +128,10 @@ public class ProductCreateRelatedCountryBrand implements RecordTrigger  {
             String internalName = inputRecord.getNew().getValue("internal_name__c", ValueType.STRING);
             String productId = inputRecord.getNew().getValue("id", ValueType.STRING);
 
-            Iterator<QueryResult> countries = countriesInRegionMap.get(regionId).iterator();
+            Iterator<QueryExecutionResult> countries = countriesInRegionMap.get(regionId).iterator();
 
             while (countries.hasNext()){
-                QueryResult country =countries.next();
+                QueryExecutionResult country =countries.next();
                 Record r = recordService.newRecord("vsdk_country_brand__c");
                 r.setValue("name__v", internalName + " (" + country.getValue("name__v", ValueType.STRING) + ")");
                 r.setValue("country__c", country.getValue("id", ValueType.STRING));
